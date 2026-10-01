@@ -12,13 +12,7 @@ const { createContact } = require('../controllers/contact.controller');
  *       required: true
  *       content:
  *         application/json:
- *           schema:
- *             type: object
- *             required: [name, email, message]
- *             properties:
- *               name: { type: string, example: "Juan Lopez" }
- *               email: { type: string, example: "juan@example.com" }
- *               message: { type: string, example: "Quisiera mas info del curso de Redes" }
+ *           schema: { $ref: '#/components/schemas/ContactoInput' }
  *     responses:
  *       201:
  *         description: Mensaje enviado

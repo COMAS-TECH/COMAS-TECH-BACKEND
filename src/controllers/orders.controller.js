@@ -1,9 +1,9 @@
 const pool = require('../config/db');
 const { hashValue, lastChars } = require('../utils/hash');
 
-const METODOS_VALIDOS = ['yape', 'tarjeta'];
+const METODOS_VALIDOS = ['yape', 'plin'];
 
-// POST /api/orders -> crea una matricula/orden (sin login, "checkout" como invitado)
+// POST /api/orders  (requiere login)
 async function createOrder(req, res) {
   try {
     const {
@@ -14,19 +14,25 @@ async function createOrder(req, res) {
       phone,
       document_number,
       payment_method,
-      card_last4,
-      card_brand,
     } = req.body;
 
-    if (!course_id || !full_name || !email || !phone || !document_number || !payment_method) {
+    if (
+      !course_id ||
+      !full_name ||
+      !email ||
+      !phone ||
+      !document_number ||
+      !payment_method
+    ) {
       return res.status(400).json({ message: 'Faltan datos obligatorios' });
     }
 
     if (!METODOS_VALIDOS.includes(payment_method)) {
-      return res.status(400).json({ message: 'Metodo de pago invalido' });
+      return res
+        .status(400)
+        .json({ message: 'Metodo de pago invalido. Usa yape o plin.' });
     }
 
-    // 1) Validar que el curso exista
     const [courseRows] = await pool.query(
       'SELECT * FROM courses WHERE id = ? AND active = 1',
       [course_id]
@@ -36,7 +42,6 @@ async function createOrder(req, res) {
     }
     const course = courseRows[0];
 
-    // 2) Resolver el monto segun el plan de pago elegido (o precio base del curso)
     let amount = Number(course.price);
     let planId = null;
     if (payment_plan_id) {
@@ -45,24 +50,24 @@ async function createOrder(req, res) {
         [payment_plan_id, course_id]
       );
       if (planRows.length === 0) {
-        return res.status(400).json({ message: 'Plan de pago invalido para este curso' });
+        return res
+          .status(400)
+          .json({ message: 'Plan de pago invalido para este curso' });
       }
       amount = Number(planRows[0].total_amount);
       planId = planRows[0].id;
     }
 
-    // 3) Nunca se guarda el numero de documento ni la tarjeta completa.
-    //    Se hashea el documento (bcrypt) y de la tarjeta solo se guardan los ultimos 4 digitos.
     const document_number_hash = await hashValue(document_number);
     const document_last4 = lastChars(document_number, 4);
-    const safeCardLast4 = payment_method === 'tarjeta' ? lastChars(card_last4, 4) : null;
 
     const [result] = await pool.query(
       `INSERT INTO orders
-        (course_id, payment_plan_id, full_name, email, phone, document_number_hash, document_last4,
-         payment_method, card_last4, card_brand, amount, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente')`,
+       (user_id, course_id, payment_plan_id, full_name, email, phone,
+        document_number_hash, document_last4, payment_method, amount, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente')`,
       [
+        req.user.id,
         course_id,
         planId,
         full_name,
@@ -71,14 +76,12 @@ async function createOrder(req, res) {
         document_number_hash,
         document_last4,
         payment_method,
-        safeCardLast4,
-        payment_method === 'tarjeta' ? (card_brand || null) : null,
         amount,
       ]
     );
 
     res.status(201).json({
-      message: 'Matricula registrada correctamente',
+      message: 'Inscripcion registrada. Sube tu comprobante.',
       order_id: result.insertId,
       course: course.title,
       amount,
@@ -87,8 +90,81 @@ async function createOrder(req, res) {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Error al registrar la matricula' });
+    res.status(500).json({ message: 'Error al registrar la inscripcion' });
   }
 }
 
-module.exports = { createOrder };
+// POST /api/orders/:id/receipt  (sube captura)
+async function uploadReceipt(req, res) {
+  try {
+    const { id } = req.params;
+    if (!req.file) {
+      return res.status(400).json({ message: 'No se subio ningun archivo' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT * FROM orders WHERE id = ? AND user_id = ?',
+      [id, req.user.id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Orden no encontrada' });
+    }
+
+    const receiptUrl = `/uploads/${req.file.filename}`;
+
+    await pool.query(
+      `UPDATE orders SET receipt_url = ?, status = 'en_revision' WHERE id = ?`,
+      [receiptUrl, id]
+    );
+
+    res.json({
+      message: 'Comprobante subido. Un administrador lo revisara pronto.',
+      receipt_url: receiptUrl,
+      status: 'en_revision',
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al subir comprobante' });
+  }
+}
+
+// GET /api/orders/me  (mis inscripciones)
+async function myOrders(req, res) {
+  try {
+    const [rows] = await pool.query(
+      `SELECT o.*, c.title AS course_title, c.image_url AS course_image,
+              c.duration_weeks, c.modality
+       FROM orders o
+       JOIN courses c ON c.id = o.course_id
+       WHERE o.user_id = ?
+       ORDER BY o.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al listar tus inscripciones' });
+  }
+}
+
+// GET /api/orders/me/courses  (mis cursos abiertos / matriculados)
+async function myEnrollments(req, res) {
+  try {
+    const [rows] = await pool.query(
+      `SELECT e.id AS enrollment_id, e.opened_at,
+              c.id AS course_id, c.title, c.description, c.image_url,
+              c.duration_weeks, c.modality, c.category
+       FROM enrollments e
+       JOIN courses c ON c.id = e.course_id
+       WHERE e.user_id = ?
+       ORDER BY e.opened_at DESC`,
+      [req.user.id]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al listar tus cursos' });
+  }
+}
+
+module.exports = { createOrder, uploadReceipt, myOrders, myEnrollments };

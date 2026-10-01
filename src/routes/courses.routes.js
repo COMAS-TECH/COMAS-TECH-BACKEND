@@ -1,36 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { getAllCourses, getCourseById } = require('../controllers/courses.controller');
-
-/**
- * @swagger
- * components:
- *   schemas:
- *     PaymentPlan:
- *       type: object
- *       properties:
- *         id: { type: integer }
- *         course_id: { type: integer }
- *         name: { type: string, example: "3 cuotas" }
- *         installments: { type: integer, example: 3 }
- *         total_amount: { type: number, example: 180.00 }
- *     Course:
- *       type: object
- *       properties:
- *         id: { type: integer }
- *         title: { type: string, example: "Desarrollo Web con IA" }
- *         slug: { type: string, example: "desarrollo-web-ia" }
- *         description: { type: string }
- *         image_url: { type: string, example: "/images/curso-web.jpg" }
- *         category: { type: string, example: "Programacion" }
- *         duration_weeks: { type: integer, example: 8 }
- *         modality: { type: string, example: "virtual" }
- *         price: { type: number, example: 150.00 }
- *         has_certification: { type: boolean, example: true }
- *         payment_plans:
- *           type: array
- *           items: { $ref: '#/components/schemas/PaymentPlan' }
- */
+const {
+  getAllCourses,
+  getCourseById,
+} = require('../controllers/courses.controller');
 
 /**
  * @swagger
@@ -68,6 +41,9 @@ router.get('/', getAllCourses);
  *             schema: { $ref: '#/components/schemas/Course' }
  *       404:
  *         description: Curso no encontrado
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.get('/:id', getCourseById);
 

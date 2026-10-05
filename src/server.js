@@ -11,6 +11,8 @@ const coursesRoutes = require('./routes/courses.routes');
 const ordersRoutes = require('./routes/orders.routes');
 const contactRoutes = require('./routes/contact.routes');
 const adminRoutes = require('./routes/admin.routes');
+const settingsRoutes = require('./routes/settings.routes');
+const uploadsRoutes = require('./routes/uploads.routes');
 
 const app = express();
 
@@ -21,8 +23,12 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Servir archivos subidos (comprobantes de Yape/Plin)
-app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+// Archivos publicos: portadas de cursos y video de la Home
+app.use('/uploads/courses', express.static(path.resolve(__dirname, '../uploads/courses')));
+app.use('/uploads/home-video', express.static(path.resolve(__dirname, '../uploads/home-video')));
+
+// Comprobantes de pago: solo con sesion (admin o dueño de la orden)
+app.use('/uploads', uploadsRoutes);
 
 // ============================================
 // DOCUMENTACION SWAGGER
@@ -45,6 +51,7 @@ app.use('/api/courses', coursesRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // ============================================
 // 404 y manejo de errores
@@ -58,7 +65,7 @@ app.use((err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res
       .status(400)
-      .json({ message: 'El archivo excede el tamaño maximo (5MB)' });
+      .json({ message: 'El archivo excede el tamaño maximo permitido' });
   }
   res.status(err.status || 500).json({
     message: err.message || 'Error interno del servidor',

@@ -1,6 +1,10 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { signToken } = require('../utils/jwt');
+const {
+  recordLoginFailure,
+  recordLoginSuccess,
+} = require('../middlewares/rateLimit.middleware');
 
 // POST /api/auth/register
 async function register(req, res) {
@@ -66,14 +70,18 @@ async function login(req, res) {
       [email.toLowerCase().trim()]
     );
     if (rows.length === 0) {
+      recordLoginFailure(req);
       return res.status(401).json({ message: 'Credenciales invalidas' });
     }
 
     const user = rows[0];
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
+      recordLoginFailure(req);
       return res.status(401).json({ message: 'Credenciales invalidas' });
     }
+
+    recordLoginSuccess(req);
 
     const token = signToken({
       id: user.id,

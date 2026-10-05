@@ -152,6 +152,11 @@ const options = {
               nullable: true,
               example: '/uploads/receipt-1699999999.png',
             },
+            course_image_url: {
+              type: 'string',
+              nullable: true,
+              example: '/uploads/courses/course-1699999999.jpg',
+            },
             status: {
               type: 'string',
               enum: ['pendiente', 'en_revision', 'pagado', 'rechazado'],
@@ -211,6 +216,19 @@ const options = {
               type: 'string',
               nullable: true,
               example: 'Comprobante verificado correctamente',
+            },
+          },
+        },
+
+        // ---------- CONFIGURACION ----------
+        HomeVideo: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', example: 'Conoce Comas TECH' },
+            video_url: {
+              type: 'string',
+              nullable: true,
+              example: '/uploads/home-video/home-video-1699999999.mp4',
             },
           },
         },

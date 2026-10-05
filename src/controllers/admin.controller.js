@@ -5,7 +5,8 @@ async function listOrders(req, res) {
   try {
     const { status } = req.query;
     let sql = `
-      SELECT o.*, c.title AS course_title, u.email AS user_email,
+      SELECT o.*, c.title AS course_title, c.image_url AS course_image_url,
+             u.email AS user_email,
              u.full_name AS user_full_name
       FROM orders o
       JOIN courses c ON c.id = o.course_id

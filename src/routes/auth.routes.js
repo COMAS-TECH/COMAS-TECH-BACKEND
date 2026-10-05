@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { register, login, me } = require('../controllers/auth.controller');
 const { authRequired } = require('../middlewares/auth.middleware');
+const { loginLimiter } = require('../middlewares/rateLimit.middleware');
 
 /**
  * @swagger
@@ -50,8 +51,10 @@ router.post('/register', register);
  *         content:
  *           application/json:
  *             schema: { $ref: '#/components/schemas/Error' }
+ *       429:
+ *         description: Demasiados intentos fallidos (bloqueo temporal)
  */
-router.post('/login', login);
+router.post('/login', loginLimiter, login);
 
 /**
  * @swagger

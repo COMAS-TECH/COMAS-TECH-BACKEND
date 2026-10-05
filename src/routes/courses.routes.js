@@ -42,14 +42,8 @@ router.get('/', getAllCourses);
  *     responses:
  *       200:
  *         description: Detalle del curso
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/Course' }
  *       404:
  *         description: Curso no encontrado
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.get('/:id', getCourseById);
 
@@ -73,48 +67,27 @@ router.get('/:id', getCourseById);
  *           schema:
  *             type: object
  *             properties:
- *               title:
- *                 type: string
- *                 example: 'Desarrollo Web con IA'
- *               description:
- *                 type: string
- *               category:
- *                 type: string
- *                 example: 'Programacion'
- *               duration_weeks:
- *                 type: integer
- *                 example: 8
- *               modality:
- *                 type: string
- *                 example: 'virtual'
- *               price:
- *                 type: number
- *                 example: 150.0
- *               has_certification:
- *                 type: string
- *                 enum: ['0', '1']
- *               active:
- *                 type: string
- *                 enum: ['0', '1']
+ *               title: { type: string }
+ *               description: { type: string }
+ *               category: { type: string }
+ *               duration_weeks: { type: integer }
+ *               modality: { type: string }
+ *               price: { type: number }
+ *               has_certification: { type: string, enum: ['0','1'] }
+ *               active: { type: string, enum: ['0','1'] }
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: 'Portada JPG/PNG/WEBP, max 5MB (opcional)'
  *     responses:
  *       200:
  *         description: Curso actualizado
- *         content:
- *           application/json:
- *             schema: { $ref: '#/components/schemas/Course' }
- *       400:
- *         description: Datos invalidos
- *       401:
- *         description: No autenticado
- *       403:
- *         description: Solo administradores
- *       404:
- *         description: Curso no encontrado
  */
-router.put('/:id', authRequired, adminRequired, upload.courseImage.single('image'), updateCourse);
+router.put(
+  '/:id',
+  authRequired,
+  adminRequired,
+  upload.courseImage.single('image'),
+  updateCourse
+);
 
 module.exports = router;

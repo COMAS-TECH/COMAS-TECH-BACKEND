@@ -1,17 +1,49 @@
+const fs = require('fs');
+const path = require('path');
 const pool = require('../config/db');
 
-// GET /api/courses  -> lista todos los cursos activos con sus planes de pago
+const DEFAULT_COURSE_IMAGE = '/uploads/courses/imagen_defecto.jpg';
+const COURSES_UPLOAD_DIR = path.resolve(__dirname, '../../uploads/courses');
+
+/** Asegura que image_url nunca vaya vacío y normaliza booleanos */
+function withDefaultImage(course) {
+  return {
+    ...course,
+    has_certification: !!course.has_certification,
+    image_url: course.image_url || DEFAULT_COURSE_IMAGE,
+  };
+}
+
+/** Borra un archivo físico a partir de su URL pública (/uploads/...) */
+function deleteUploadByUrl(imageUrl) {
+  if (!imageUrl) return;
+  if (imageUrl === DEFAULT_COURSE_IMAGE) return;
+  if (!imageUrl.startsWith('/uploads/courses/')) return;
+
+  const filename = path.basename(imageUrl);
+  const abs = path.join(COURSES_UPLOAD_DIR, filename);
+  if (!abs.startsWith(COURSES_UPLOAD_DIR)) return;
+
+  fs.promises
+    .unlink(abs)
+    .then(() => console.log(`🗑️  Portada anterior eliminada: ${filename}`))
+    .catch((err) => {
+      if (err.code !== 'ENOENT') {
+        console.warn(`⚠️  No se pudo borrar ${filename}:`, err.message);
+      }
+    });
+}
+
+// GET /api/courses -> lista todos los cursos activos con sus planes de pago
 async function getAllCourses(req, res) {
   try {
     const [courses] = await pool.query(
       'SELECT * FROM courses WHERE active = 1 ORDER BY created_at DESC'
     );
-
     const [plans] = await pool.query('SELECT * FROM payment_plans');
 
     const data = courses.map((course) => ({
-      ...course,
-      has_certification: !!course.has_certification,
+      ...withDefaultImage(course),
       payment_plans: plans.filter((p) => p.course_id === course.id),
     }));
 
@@ -37,7 +69,10 @@ async function getCourseById(req, res) {
       'SELECT * FROM payment_plans WHERE course_id = ?',
       [id]
     );
-    res.json({ ...rows[0], has_certification: !!rows[0].has_certification, payment_plans: plans });
+    res.json({
+      ...withDefaultImage(rows[0]),
+      payment_plans: plans,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error al obtener el curso' });
@@ -83,10 +118,12 @@ async function updateCourse(req, res) {
     const newHasCert = ['1', 'true', 1, true].includes(has_certification) ? 1 : 0;
     const newActive = ['1', 'true', 1, true].includes(active) ? 1 : 0;
 
+    const previousImage = rows[0].image_url;
+
     // Si se subio una portada nueva, se usa; si no, se conserva la actual
     const imageUrl = req.file
       ? `/uploads/courses/${req.file.filename}`
-      : rows[0].image_url;
+      : previousImage || DEFAULT_COURSE_IMAGE;
 
     await pool.query(
       `UPDATE courses
@@ -107,6 +144,15 @@ async function updateCourse(req, res) {
       ]
     );
 
+    // Si se reemplazo la portada, borra la anterior (si no era la default)
+    if (req.file && previousImage && previousImage !== imageUrl) {
+      deleteUploadByUrl(previousImage);
+    }
+
+    if (req.file) {
+      console.log(`📤 Nueva portada para curso ${id}: ${imageUrl}`);
+    }
+
     const [updatedRows] = await pool.query('SELECT * FROM courses WHERE id = ?', [id]);
     const [plans] = await pool.query(
       'SELECT * FROM payment_plans WHERE course_id = ?',
@@ -114,8 +160,7 @@ async function updateCourse(req, res) {
     );
 
     res.json({
-      ...updatedRows[0],
-      has_certification: !!updatedRows[0].has_certification,
+      ...withDefaultImage(updatedRows[0]),
       payment_plans: plans,
     });
   } catch (err) {
@@ -124,4 +169,9 @@ async function updateCourse(req, res) {
   }
 }
 
-module.exports = { getAllCourses, getCourseById, updateCourse };
+module.exports = {
+  getAllCourses,
+  getCourseById,
+  updateCourse,
+  DEFAULT_COURSE_IMAGE,
+};

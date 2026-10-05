@@ -1,5 +1,6 @@
 require('dotenv').config();
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
@@ -24,8 +25,22 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Archivos publicos: portadas de cursos y video de la Home
-app.use('/uploads/courses', express.static(path.resolve(__dirname, '../uploads/courses')));
-app.use('/uploads/home-video', express.static(path.resolve(__dirname, '../uploads/home-video')));
+const COURSES_DIR = path.resolve(__dirname, '../uploads/courses');
+const HOME_VIDEO_DIR = path.resolve(__dirname, '../uploads/home-video');
+
+for (const dir of [COURSES_DIR, HOME_VIDEO_DIR]) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+const DEFAULT_COURSE_IMAGE_PATH = path.join(COURSES_DIR, 'imagen_defecto.jpg');
+if (!fs.existsSync(DEFAULT_COURSE_IMAGE_PATH)) {
+  console.warn(
+    `⚠️  Falta la imagen por defecto en: ${DEFAULT_COURSE_IMAGE_PATH}\n` +
+    `    Coloca una imagen llamada "imagen_defecto.jpg" en uploads/courses/`
+  );
+}
+
+app.use('/uploads/courses', express.static(COURSES_DIR));
+app.use('/uploads/home-video', express.static(HOME_VIDEO_DIR));
 
 // Comprobantes de pago: solo con sesion (admin o dueño de la orden)
 app.use('/uploads', uploadsRoutes);
@@ -62,10 +77,16 @@ app.use((req, res) => res.status(404).json({ message: 'Ruta no encontrada' }));
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
+
   if (err.code === 'LIMIT_FILE_SIZE') {
-    return res
-      .status(400)
-      .json({ message: 'El archivo excede el tamaño maximo permitido' });
+    return res.status(413).json({
+      message: 'El archivo excede el tamaño maximo permitido',
+    });
+  }
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({
+      message: `Campo de archivo inesperado: ${err.field}`,
+    });
   }
   res.status(err.status || 500).json({
     message: err.message || 'Error interno del servidor',
@@ -79,5 +100,8 @@ const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`\n🚀 Comas TECH API corriendo en http://localhost:${PORT}`);
   console.log(`📚 Swagger docs en http://localhost:${PORT}/api-docs`);
-  console.log(`🩺 Health check en http://localhost:${PORT}/api/health\n`);
+  console.log(`🩺 Health check en http://localhost:${PORT}/api/health`);
+  console.log(
+    `🖼️  Imagen por defecto: http://localhost:${PORT}/uploads/courses/imagen_defecto.jpg\n`
+  );
 });

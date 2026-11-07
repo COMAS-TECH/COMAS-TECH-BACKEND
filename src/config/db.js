@@ -18,7 +18,7 @@ const pool = mysql.createPool({
   queueLimit: 0,
   ssl: {
     ca: caCert,
-    rejectUnauthorized: true, // Ahora sí validamos con el CA de Aiven
+    rejectUnauthorized: undefined, // Ahora sí validamos con el CA de Aiven
   },
 });
 

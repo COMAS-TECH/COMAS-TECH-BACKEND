@@ -1,11 +1,7 @@
 const path = require('path');
-const fs = require('fs');
 require('dotenv').config();
 
 const mysql = require('mysql2/promise');
-
-// Leer el certificado CA desde la raíz del proyecto
-const caCert = fs.readFileSync(path.resolve(__dirname, '../../ca.pem'));
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -17,8 +13,8 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   ssl: {
-    ca: caCert,
-    rejectUnauthorized: undefined, // Ahora sí validamos con el CA de Aiven
+    rejectUnauthorized: false,
+    checkServerIdentity: () => undefined,  // 👈 ignora validación del hostname
   },
 });
 

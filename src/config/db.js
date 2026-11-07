@@ -14,7 +14,7 @@ const pool = mysql.createPool({
   queueLimit: 0,
   // 👇 SSL obligatorio para Aiven (y la mayoría de DBs en la nube)
   ssl: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: true,
   },
 });
 
